@@ -19,9 +19,6 @@ typedef double real64;
 #define local_persist static
 #define global_persist static
 
-// sqrt (1/2)
-#define VELOCITY_CONSTANT 0.7071067811865476
-
 struct V2
 {
         real32 x, y;

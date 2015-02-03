@@ -1,10 +1,10 @@
 #include "main.h"
 
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
+const int32 SCREEN_WIDTH = 640;
+const int32 SCREEN_HEIGHT = 480;
 
 // Initialize SDL and create window
-SDL_Window *initializeSDL()
+SDL_Window* initializeSDL()
 {
         // Initialize SDL
         bool initStatus = SDL_Init( SDL_INIT_VIDEO );
@@ -15,7 +15,7 @@ SDL_Window *initializeSDL()
         }
 
         // Create window
-        SDL_Window *window = SDL_CreateWindow( "SDL Tutorial", 0, 0,
+        SDL_Window* window = SDL_CreateWindow( "SDL Tutorial", 0, 0,
                                     SCREEN_WIDTH, SCREEN_HEIGHT,
                                     SDL_WINDOW_SHOWN );
 
@@ -23,10 +23,10 @@ SDL_Window *initializeSDL()
 }
 
 // Create renderer
-SDL_Renderer *createRenderer( SDL_Window *window )
+SDL_Renderer* createRenderer( SDL_Window *window )
 {
         // Create renderer for window
-        SDL_Renderer *renderer =
+        SDL_Renderer* renderer =
                 SDL_CreateRenderer( window, -1,
                                     SDL_RENDERER_ACCELERATED |
                                     SDL_RENDERER_PRESENTVSYNC );
@@ -35,7 +35,7 @@ SDL_Renderer *createRenderer( SDL_Window *window )
 }
 
 // Shutdown SDL
-void shutdownSDL( SDL_Window *window, SDL_Renderer *renderer )
+void shutdownSDL( SDL_Window* window, SDL_Renderer* renderer )
 {
         // Destroy window and renderer
         SDL_DestroyRenderer( renderer );
@@ -85,7 +85,7 @@ bool parseEvents()
 }
 
 internal void
-setRenderDrawColor( SDL_Renderer *renderer,
+setRenderDrawColor( SDL_Renderer* renderer,
                     real32 colorR, real32 colorG, real32 colorB, real32 colorA )
 {
         uint8 R = colorReal32ToUint8( colorR );
@@ -97,7 +97,7 @@ setRenderDrawColor( SDL_Renderer *renderer,
 }
 
 internal void
-drawRectangle( SDL_Renderer *renderer,
+drawRectangle( SDL_Renderer* renderer,
                V2 position, V2 size,
                real32 colorR, real32 colorG, real32 colorB, real32 colorA )
 {
@@ -109,13 +109,11 @@ drawRectangle( SDL_Renderer *renderer,
 }
 
 internal void
-drawBackground( SDL_Renderer *renderer, const GameState gameState )
+drawBackground( SDL_Renderer* renderer, const GameState gameState )
 {
-        //SDL_SetRenderTarget( renderer, texture );
-
         const int32 tileRows = 36;
         const int32 tileCols = 16;
-        const int32 tileSize = 80;
+        const int32 tileSize = 64;
 
         const Camera camera = gameState.camera;
         
@@ -190,12 +188,10 @@ drawBackground( SDL_Renderer *renderer, const GameState gameState )
                         }
                 }
         }
-
-        //SDL_SetRenderTarget( renderer, NULL );
 }
 
 // Draw to the screen
-void draw( SDL_Window *window, SDL_Renderer *renderer, const GameState gameState )
+void draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
 {
         Player player = gameState.player;
         Camera camera = gameState.camera;
@@ -218,7 +214,9 @@ void draw( SDL_Window *window, SDL_Renderer *renderer, const GameState gameState
 // Update game state
 GameState updateGame( const GameState oldGameState, real32 dt )
 {
-        const uint8 *keystate = SDL_GetKeyboardState( NULL );
+        const real32 VELOCITY_CONSTANT = 0.7071067811865476;
+        
+        const uint8* keystate = SDL_GetKeyboardState( NULL );
 
         V2 dPlayer = { 0.0 ,0.0 };
 
@@ -243,7 +241,7 @@ GameState updateGame( const GameState oldGameState, real32 dt )
                 dPlayer.x += 1.0;
         }
 
-        real32 speed = 12.0;
+        real32 speed = 50.0;
         dPlayer = speed * dPlayer;
         
         if (dPlayer.x != 0.0 && dPlayer.y != 0.0)
@@ -254,7 +252,7 @@ GameState updateGame( const GameState oldGameState, real32 dt )
         Player player = oldGameState.player;
 
         // Friction force
-        dPlayer += -1.5 * player.velocity;
+        dPlayer += -8.0 * player.velocity;
 
         player.position += (square(dt) * 0.5 * dPlayer) + player.velocity;
         player.velocity += dt * dPlayer;
@@ -303,10 +301,10 @@ GameState updateGame( const GameState oldGameState, real32 dt )
         return gameState;
 }
 
-int32 main( int32 argc, char *argv[] )
+int32 main( int32 argc, char** argv )
 {
         // Initialize SDL and create window
-        SDL_Window *window = initializeSDL();
+        SDL_Window* window = initializeSDL();
         if ( window == NULL )
         {
                 printf( "Window could not be created. SDL_Error: %s\n",
@@ -315,7 +313,7 @@ int32 main( int32 argc, char *argv[] )
         }
 
         // Create Renderer
-        SDL_Renderer *renderer = createRenderer( window );
+        SDL_Renderer* renderer = createRenderer( window );
         if( renderer == NULL )
         {
                 printf( "Renderer could not be created. SDL Error: %s\n",
@@ -347,9 +345,9 @@ int32 main( int32 argc, char *argv[] )
         // While running
         bool quit = false;
 
-        uint32 lastTime = 0;
+        uint32 lastTime;
         uint32 currentTime = SDL_GetTicks();
-        real32 dt = ((real32)currentTime - (real32)lastTime) / 1000;
+        real32 dt;
         
         while ( !quit )
         {
