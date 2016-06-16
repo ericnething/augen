@@ -1,10 +1,14 @@
 #include "main.h"
 
-const int32 SCREEN_WIDTH = 640;
-const int32 SCREEN_HEIGHT = 480;
+const int32 SCREEN_WIDTH = 1920/2;
+const int32 SCREEN_HEIGHT = 1080/2;
+const uint32 TILE_MAP_ROWS = 36;
+const uint32 TILE_MAP_COLS = 16;
+const real32 TILE_SIZE = 64;
 
 // Initialize SDL and create window
-SDL_Window* initializeSDL()
+SDL_Window*
+initializeSDL()
 {
         // Initialize SDL
         bool initStatus = SDL_Init( SDL_INIT_VIDEO );
@@ -23,7 +27,8 @@ SDL_Window* initializeSDL()
 }
 
 // Create renderer
-SDL_Renderer* createRenderer( SDL_Window *window )
+SDL_Renderer*
+createRenderer( SDL_Window *window )
 {
         // Create renderer for window
         SDL_Renderer* renderer =
@@ -35,7 +40,9 @@ SDL_Renderer* createRenderer( SDL_Window *window )
 }
 
 // Shutdown SDL
-void shutdownSDL( SDL_Window* window, SDL_Renderer* renderer )
+void
+shutdownSDL( SDL_Window* window,
+             SDL_Renderer* renderer )
 {
         // Destroy window and renderer
         SDL_DestroyRenderer( renderer );
@@ -46,7 +53,8 @@ void shutdownSDL( SDL_Window* window, SDL_Renderer* renderer )
 }
 
 // Load a surface from a file
-SDL_Surface* loadSurface( std::string path )
+SDL_Surface*
+loadSurface( std::string path )
 {
         // Load image from path
         SDL_Surface* loadedSurface = SDL_LoadBMP( path.c_str() );
@@ -60,7 +68,8 @@ SDL_Surface* loadSurface( std::string path )
 }
 
 // Handle events on the queue
-bool parseEvents()
+bool
+parseEvents()
 {
         SDL_Event event;
         bool quit = true;
@@ -86,7 +95,10 @@ bool parseEvents()
 
 internal void
 setRenderDrawColor( SDL_Renderer* renderer,
-                    real32 colorR, real32 colorG, real32 colorB, real32 colorA )
+                    real32 colorR,
+                    real32 colorG,
+                    real32 colorB,
+                    real32 colorA )
 {
         uint8 R = colorReal32ToUint8( colorR );
         uint8 G = colorReal32ToUint8( colorG );
@@ -98,8 +110,12 @@ setRenderDrawColor( SDL_Renderer* renderer,
 
 internal void
 drawRectangle( SDL_Renderer* renderer,
-               V2 position, V2 size,
-               real32 colorR, real32 colorG, real32 colorB, real32 colorA )
+               V2 position,
+               V2 size,
+               real32 colorR,
+               real32 colorG,
+               real32 colorB,
+               real32 colorA )
 {
         SDL_Rect rectangle = { (int32)position.x, (int32)position.y,
                                (int32)size.x, (int32)size.y };
@@ -109,67 +125,22 @@ drawRectangle( SDL_Renderer* renderer,
 }
 
 internal void
-drawBackground( SDL_Renderer* renderer, const GameState gameState )
+drawBackground( SDL_Renderer* renderer,
+                const GameState gameState )
 {
-        const int32 tileRows = 36;
-        const int32 tileCols = 16;
-        const int32 tileSize = 64;
-
         const Camera camera = gameState.camera;
+        const TileMap tileMap = gameState.tileMap;
         
-        uint32 tiles[tileRows][tileCols] =
+        for ( int row = 0; row < tileMap.rows; ++row )
         {
-                { 1, 1, 1, 1,  1, 0, 0, 0,  1, 1, 1, 1,  1, 1, 1, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  1, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-
-                { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 1, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-
-                { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 1, 1, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 1, 1, 1,  1, 1, 0, 0,  0, 0, 0, 1 },
-                { 0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
-                { 0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
-                { 0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1, 1, 0, 1 },
-                { 1, 0, 0, 0,  1, 1, 1, 0,  1, 1, 0, 1,  1, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1 }
-
-        };
-        
-        for ( int row = 0; row < tileRows; ++row )
-        {
-                for ( int col = 0; col < tileCols; ++col )
+                for ( int col = 0; col < tileMap.cols; ++col )
                 {
-                        int32 tileValue = tiles[row][col];
+                        int32 tileValue = tileMap.tiles[(row * tileMap.cols) + col];
                         V2 position = {
-                                col*tileSize - camera.position.x,
-                                row*tileSize - camera.position.y
+                                col*tileMap.tileSize - camera.position.x,
+                                row*tileMap.tileSize - camera.position.y
                         };
-                        V2 size = { tileSize, tileSize };
+                        V2 size = { tileMap.tileSize, tileMap.tileSize };
                         V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
 
                         // Only render tiles that are within view of the camera
@@ -191,7 +162,10 @@ drawBackground( SDL_Renderer* renderer, const GameState gameState )
 }
 
 // Draw to the screen
-void draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
+void
+draw( SDL_Window* window,
+      SDL_Renderer* renderer,
+      const GameState gameState )
 {
         Player player = gameState.player;
         Camera camera = gameState.camera;
@@ -203,19 +177,77 @@ void draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState
         drawBackground( renderer, gameState );
         
         // Draw player
+        V2 playerCenter = { player.size.x / 2, player.size.y };
         drawRectangle( renderer,
-                       player.position - camera.position, player.size,
+                       player.position - camera.position - playerCenter,
+                       player.size,
                        1.0, 1.0, 0.0, 1.0 );
         
         //Update screen
         SDL_RenderPresent( renderer );
 }
 
-// Update game state
-GameState updateGame( const GameState oldGameState, real32 dt )
+Camera
+updateCamera( GameState gameState )
 {
-        const real32 VELOCITY_CONSTANT = 0.7071067811865476;
+        Camera camera = gameState.camera;
+        Player player = gameState.player;
+        int32 scrollingType = 0;
+
+        // Smooth scrolling
+        if ( scrollingType == 0 )
+        {
+                camera.position.x = player.position.x - (SCREEN_WIDTH/2);
+                camera.position.y = player.position.y - (SCREEN_HEIGHT/2);
+        }
+        // Scroll by a fixed amount (full screen size)
+        else if ( scrollingType == 1 )
+        {
+                if (player.position.x - camera.position.x > SCREEN_WIDTH)
+                {
+                        camera.position.x += SCREEN_WIDTH;
+                }
+                if (player.position.x - camera.position.x < -player.size.x)
+                {
+                        camera.position.x -= SCREEN_WIDTH;
+                }
+                if (player.position.y - camera.position.y > SCREEN_HEIGHT)
+                {
+                        camera.position.y += SCREEN_HEIGHT;
+                }
+                if (player.position.y - camera.position.y < -player.size.y)
+                {
+                        camera.position.y -= SCREEN_HEIGHT;
+                }
+        }
+
+        return camera;
+}
+
+internal bool32
+isTileMapPointEmpty( TileMap tileMap,
+                     V2 testPoint )
+{
+        int32 tileX = truncateReal32ToInt32(testPoint.x / tileMap.tileSize);
+        int32 tileY = truncateReal32ToInt32(testPoint.y / tileMap.tileSize);
+        bool32 isEmpty = false;
         
+        if ((tileX >= 0) && (tileX < tileMap.cols) &&
+            (tileY >= 0) && (tileY < tileMap.rows))
+        {
+                uint32 tileValue = tileMap.tiles[(tileY * tileMap.cols) + tileX];
+                isEmpty = (tileValue == 0);
+        }
+        return isEmpty;
+}
+
+Player
+updatePlayer( GameState gameState,
+              real32 dt )
+{
+        Player player = gameState.player;
+        const TileMap tileMap = gameState.tileMap;
+        const real32 VELOCITY_CONSTANT = 0.7071067811865476;
         const uint8* keystate = SDL_GetKeyboardState( NULL );
 
         V2 dPlayer = { 0.0 ,0.0 };
@@ -241,62 +273,49 @@ GameState updateGame( const GameState oldGameState, real32 dt )
                 dPlayer.x += 1.0;
         }
 
-        real32 speed = 50.0;
+        real32 speed = 250.0;
         dPlayer = speed * dPlayer;
         
         if (dPlayer.x != 0.0 && dPlayer.y != 0.0)
         {
                 dPlayer *= VELOCITY_CONSTANT;
         }
-        
-        Player player = oldGameState.player;
 
         // Friction force
-        dPlayer += -8.0 * player.velocity;
+        //dPlayer += -8.0 * player.velocity;
 
-        player.position += (square(dt) * 0.5 * dPlayer) + player.velocity;
-        player.velocity += dt * dPlayer;
+        // Check if the move is valid
+        // V2 newPosition = player.position + (square(dt) * 0.5 * dPlayer) + player.velocity;
+        V2 newPosition = player.position + (dt * dPlayer);
+        V2 newPositionLeftSide = { newPosition.x - (0.5f * player.size.x), newPosition.y };
+        V2 newPositionRightSide = { newPosition.x + (0.5f * player.size.x), newPosition.y };
+        
+        if (isTileMapPointEmpty(tileMap, newPositionLeftSide) &&
+            isTileMapPointEmpty(tileMap, newPositionRightSide) &&
+            isTileMapPointEmpty(tileMap, newPosition))
+        {
+                player.position = newPosition;
+                player.velocity += dt * dPlayer;
+        }
+
+        return player;
+}
+
+// Update game state
+GameState
+updateGame( const GameState oldGameState,
+            real32 dt )
+{
+        // Update player
+        Player player = updatePlayer(oldGameState, dt);
+
+        // int32 playerTileX = truncateReal32ToInt32(player.position.x - )
 
         // Adjust camera
-        Camera camera = oldGameState.camera;
-
-        /* Set Scrolling Type
-         *
-         *  Smooth Scrolling -> 0
-         *  Fixed Scrolling  -> 1
-         *
-         */
-        int32 scrollingType = 0;
-        
-        if ( scrollingType == 0 )
-        {
-                // Smooth scrolling
-                camera.position.x = player.position.x - (SCREEN_WIDTH/2);
-                camera.position.y = player.position.y - (SCREEN_HEIGHT/2);
-        }
-        else if ( scrollingType == 1 )
-        {
-                // Scroll by a fixed amount (full screen size)
-                if (player.position.x - camera.position.x > SCREEN_WIDTH)
-                {
-                        camera.position.x += SCREEN_WIDTH;
-                }
-                if (player.position.x - camera.position.x < -player.size.x)
-                {
-                        camera.position.x -= SCREEN_WIDTH;
-                }
-                if (player.position.y - camera.position.y > SCREEN_HEIGHT)
-                {
-                        camera.position.y += SCREEN_HEIGHT;
-                }
-                if (player.position.y - camera.position.y < -player.size.y)
-                {
-                        camera.position.y -= SCREEN_HEIGHT;
-                }
-        }
+        Camera camera = updateCamera(oldGameState);
 
         // New GameState
-        GameState gameState = { player, camera };
+        GameState gameState = { player, camera, oldGameState.tileMap };
 
         return gameState;
 }
@@ -323,24 +342,70 @@ int32 main( int32 argc, char** argv )
 
 
         Player player = {
-                // position
-                SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-                // velocity
-                0, 0,
-                // size
-                30, 50
+                160, 200, // position (map coordinates)
+                0, 0, // velocity
+                30, 50 // size
         };
 
         Camera camera = {
-                // position
-                0, 0,
-                // size
-                SCREEN_WIDTH, SCREEN_HEIGHT
+                0, 0, // position (map coordinates)
+                SCREEN_WIDTH, SCREEN_HEIGHT // size
         };
 
+        // Tilemap
+        uint32 tiles1[TILE_MAP_ROWS][TILE_MAP_COLS] =
+                {
+                        { 1, 1, 1, 1,  1, 0, 0, 0,  1, 1, 1, 1,  1, 1, 1, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  1, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
+
+                        { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 1, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+
+                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 1, 1, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  0, 1, 1, 1,  1, 1, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
+                        { 0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
+                        { 0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1, 1, 0, 1 },
+                        { 1, 0, 0, 0,  1, 1, 1, 0,  1, 1, 0, 1,  1, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1 }
+                };
+        
+        TileMap tileMap1 = {
+                TILE_SIZE,
+                TILE_MAP_ROWS,
+                TILE_MAP_COLS,
+                (uint32*)tiles1
+        };
+        
         GameState gameState;
         gameState.player = player;
         gameState.camera = camera;
+        gameState.tileMap = tileMap1;
 
         // While running
         bool quit = false;
@@ -348,6 +413,7 @@ int32 main( int32 argc, char** argv )
         uint32 lastTime;
         uint32 currentTime = SDL_GetTicks();
         real32 dt;
+        int32 consoleCounter = 0;
         
         while ( !quit )
         {
@@ -364,8 +430,20 @@ int32 main( int32 argc, char** argv )
                 // Draw to the screen
                 draw( window, renderer, gameState );
 
-                // Limit to 30 fps
-                SDL_Delay( 1000 / 30 );
+                // Limit to 60 fps
+                SDL_Delay( 1000 / 60 );
+                
+                consoleCounter++;
+                if (consoleCounter >= 60)
+                {
+                        consoleCounter = 0;
+                        printf("Player (%f, %f)\n",
+                               gameState.player.position.x,
+                               gameState.player.position.y);
+                        printf("Camera (%f, %f)\n",
+                               gameState.camera.position.x,
+                               gameState.camera.position.y);
+                }
         }
 
         // Free resources and shutdown SDL
