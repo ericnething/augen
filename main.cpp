@@ -2,8 +2,6 @@
 
 const int32 SCREEN_WIDTH = 1920/2;
 const int32 SCREEN_HEIGHT = 1080/2;
-const uint32 TILE_MAP_ROWS = 36;
-const uint32 TILE_MAP_COLS = 16;
 const real32 TILE_SIZE = 64;
 
 // Initialize SDL and create window
@@ -124,70 +122,100 @@ drawRectangle( SDL_Renderer* renderer,
         SDL_RenderFillRect( renderer, &rectangle );
 }
 
-internal void
-drawBackground( SDL_Renderer* renderer,
-                const GameState gameState )
+internal TileMap*
+getTileMap( World* world,
+            int32 tileMapX,
+            int32 tileMapY )
 {
-        const Camera camera = gameState.camera;
-        const TileMap tileMap = gameState.tileMap;
+        TileMap* tileMap = 0;
         
-        for ( int row = 0; row < tileMap.rows; ++row )
+        if ((tileMapX >= 0) && (tileMapX < world->countX) &&
+            (tileMapY >= 0) && (tileMapY < world->countY))
         {
-                for ( int col = 0; col < tileMap.cols; ++col )
-                {
-                        int32 tileValue = tileMap.tiles[(row * tileMap.cols) + col];
-                        V2 position = {
-                                col*tileMap.tileSize - camera.position.x,
-                                row*tileMap.tileSize - camera.position.y
-                        };
-                        V2 size = { tileMap.tileSize, tileMap.tileSize };
-                        V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
+                tileMap = &world->tileMaps[(tileMapY * world->countX) + tileMapX];
+        }
 
-                        // Only render tiles that are within view of the camera
-                        if ( position > (-1 * size) && position < screenSize )
-                        {
-                                if ( tileValue == 0 )
-                                {
-                                        drawRectangle( renderer, position, size,
-                                                       0.5, 0.5, 0.5, 1.0 );
-                                }
-                                if ( tileValue == 1 )
-                                {
-                                        drawRectangle( renderer, position, size,
-                                                       1.0, 1.0, 1.0, 1.0 );
-                                }
-                        }
+        return tileMap;
+}
+
+internal uint32
+getTileValueUnchecked( World*   world,
+                       TileMap* tileMap,
+                       uint32   tileX,
+                       uint32   tileY)
+{
+        assert(tileMap);
+        assert((tileX >= 0) && (tileX < world->tileMapCountX) &&
+               (tileY >= 0) && (tileY < world->tileMapCountY));
+
+        uint32 tileValue = tileMap->tiles[(tileY * world->tileMapCountX) + tileX];
+        return tileValue;
+}
+
+internal bool32
+isTileMapPointEmpty( World*   world,
+                     TileMap* tileMap,
+                     V2       testPoint)
+{
+        bool32 isEmpty = false;
+
+        if (tileMap)
+        {
+                int32 tileX = truncateReal32ToInt32(testPoint.x / world->tileSideInPixels);
+                int32 tileY = truncateReal32ToInt32(testPoint.y / world->tileSideInPixels);
+        
+                if ((tileX >= 0) && (tileX < world->tileMapCountX) &&
+                    (tileY >= 0) && (tileY < world->tileMapCountY))
+                {
+                        uint32 tileValue = getTileValueUnchecked(world, tileMap, tileX, tileY);
+                        isEmpty = (tileValue == 0);
                 }
         }
+        return isEmpty;
 }
 
-// Draw to the screen
-void
-draw( SDL_Window* window,
-      SDL_Renderer* renderer,
-      const GameState gameState )
+internal bool32
+isWorldPointEmpty( World* world,
+                   uint32 testTileMapX,
+                   uint32 testTileMapY,
+                   V2     testPoint )
 {
-        Player player = gameState.player;
-        Camera camera = gameState.camera;
-        
-        //Clear screen
-        setRenderDrawColor( renderer, 0.0, 0.0, 0.0, 1.0 );
-        SDL_RenderClear( renderer );
+        bool32 isEmpty = false;
 
-        drawBackground( renderer, gameState );
-        
-        // Draw player
-        V2 playerCenter = { player.size.x / 2, player.size.y };
-        drawRectangle( renderer,
-                       player.position - camera.position - playerCenter,
-                       player.size,
-                       1.0, 1.0, 0.0, 1.0 );
-        
-        //Update screen
-        SDL_RenderPresent( renderer );
+        int32 testTileX = truncateReal32ToInt32(testPoint.x / world->tileSideInPixels);
+        int32 testTileY = truncateReal32ToInt32(testPoint.y / world->tileSideInPixels);
+
+        if (testTileX < 0)
+        {
+                testTileX = world->tileMapCountX + testTileX;
+                --testTileMapX;
+        }
+        if (testTileY < 0)
+        {
+                testTileY = world->tileMapCountY + testTileY;
+                --testTileMapX;
+        }
+        if (testTileX >= world->tileMapCountX)
+        {
+                testTileX = testTileX - world->tileMapCountX;
+                ++testTileMapX;
+        }
+        if (testTileY >= world->tileMapCountY)
+        {
+                testTileY = testTileY - world->tileMapCountY;
+                ++testTileMapX;
+        }
+
+        TileMap* tileMap = getTileMap(world, testTileMapX, testTileMapY);
+                
+        if (tileMap)
+        {
+                isEmpty = isTileMapPointEmpty(world, tileMap, testPoint);
+        }
+        return isEmpty;
 }
 
-Camera
+internal Camera
 updateCamera( GameState gameState )
 {
         Camera camera = gameState.camera;
@@ -224,59 +252,39 @@ updateCamera( GameState gameState )
         return camera;
 }
 
-internal bool32
-isTileMapPointEmpty( TileMap tileMap,
-                     V2 testPoint )
-{
-        int32 tileX = truncateReal32ToInt32(testPoint.x / tileMap.tileSize);
-        int32 tileY = truncateReal32ToInt32(testPoint.y / tileMap.tileSize);
-        bool32 isEmpty = false;
-        
-        if ((tileX >= 0) && (tileX < tileMap.cols) &&
-            (tileY >= 0) && (tileY < tileMap.rows))
-        {
-                uint32 tileValue = tileMap.tiles[(tileY * tileMap.cols) + tileX];
-                isEmpty = (tileValue == 0);
-        }
-        return isEmpty;
-}
-
-Player
+internal Player
 updatePlayer( GameState gameState,
               real32 dt )
 {
+        World* world = gameState.world;
         Player player = gameState.player;
-        const TileMap tileMap = gameState.tileMap;
+        const TileMap* tileMap = getTileMap(gameState.world, player.tileMapX, player.tileMapY);
         const real32 VELOCITY_CONSTANT = 0.7071067811865476;
         const uint8* keystate = SDL_GetKeyboardState( NULL );
 
-        V2 dPlayer = { 0.0 ,0.0 };
+        V2 dPlayer = { 0.0f ,0.0f };
 
-        // Up
-        if ( keystate[ SDL_SCANCODE_W ] )
+        if ( keystate[ SDL_SCANCODE_W ] ) // Up
         {
-                dPlayer.y += -1.0;
+                dPlayer.y += -1.0f;
         }
-        // Down
-        if ( keystate[ SDL_SCANCODE_S ] )
+        if ( keystate[ SDL_SCANCODE_S ] ) // Down
         {
-                dPlayer.y += 1.0;
+                dPlayer.y += 1.0f;
         }
-        // Left
-        if ( keystate[ SDL_SCANCODE_A ] )
+        if ( keystate[ SDL_SCANCODE_A ] ) // Left
         {
-                dPlayer.x += -1.0;
+                dPlayer.x += -1.0f;
         }
-        // Right
-        if ( keystate[ SDL_SCANCODE_D ] )
+        if ( keystate[ SDL_SCANCODE_D ] ) // Right
         {
-                dPlayer.x += 1.0;
+                dPlayer.x += 1.0f;
         }
 
-        real32 speed = 250.0;
+        real32 speed = 180.0;
         dPlayer = speed * dPlayer;
         
-        if (dPlayer.x != 0.0 && dPlayer.y != 0.0)
+        if (dPlayer.x != 0.0f && dPlayer.y != 0.0f)
         {
                 dPlayer *= VELOCITY_CONSTANT;
         }
@@ -290,9 +298,9 @@ updatePlayer( GameState gameState,
         V2 newPositionLeftSide = { newPosition.x - (0.5f * player.size.x), newPosition.y };
         V2 newPositionRightSide = { newPosition.x + (0.5f * player.size.x), newPosition.y };
         
-        if (isTileMapPointEmpty(tileMap, newPositionLeftSide) &&
-            isTileMapPointEmpty(tileMap, newPositionRightSide) &&
-            isTileMapPointEmpty(tileMap, newPosition))
+        if (isWorldPointEmpty(world, player.tileMapX, player.tileMapY, newPositionLeftSide) &&
+            isWorldPointEmpty(world, player.tileMapX, player.tileMapY, newPositionRightSide) &&
+            isWorldPointEmpty(world, player.tileMapX, player.tileMapY, newPosition))
         {
                 player.position = newPosition;
                 player.velocity += dt * dPlayer;
@@ -302,7 +310,7 @@ updatePlayer( GameState gameState,
 }
 
 // Update game state
-GameState
+internal GameState
 updateGame( const GameState oldGameState,
             real32 dt )
 {
@@ -315,9 +323,80 @@ updateGame( const GameState oldGameState,
         Camera camera = updateCamera(oldGameState);
 
         // New GameState
-        GameState gameState = { player, camera, oldGameState.tileMap };
+        GameState newGameState = oldGameState;
+        newGameState.player = player;
+        newGameState.camera = camera;
 
-        return gameState;
+        return newGameState;
+}
+
+internal void
+drawBackground( SDL_Renderer*   renderer,
+                const GameState gameState )
+{
+        World* world = gameState.world;
+        Camera camera = gameState.camera;
+        TileMap* tileMap = getTileMap(gameState.world,
+                                      gameState.player.tileMapX,
+                                      gameState.player.tileMapY);
+
+        assert(tileMap);
+        // printf("TileMapCountY %d\n", world->tileMapCountY);
+        
+        for ( int row = 0; row < world->tileMapCountY; ++row )
+        {
+                for ( int col = 0; col < world->tileMapCountX; ++col )
+                {
+                        uint32 tileValue = getTileValueUnchecked(world, tileMap, col, row);
+                        V2 position = {
+                                col * world->tileSideInPixels - camera.position.x,
+                                row * world->tileSideInPixels - camera.position.y
+                        };
+                        V2 size = { (real32)world->tileSideInPixels, (real32)world->tileSideInPixels };
+                        V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
+
+                        // Only render tiles that are within view of the camera
+                        if ( position > (-1 * size) && position < screenSize )
+                        {
+                                if ( tileValue == 0 )
+                                {
+                                        drawRectangle( renderer, position, size,
+                                                       0.5, 0.5, 0.5, 1.0 );
+                                }
+                                if ( tileValue == 1 )
+                                {
+                                        drawRectangle( renderer, position, size,
+                                                       1.0, 1.0, 1.0, 1.0 );
+                                }
+                        }
+                }
+        }
+}
+
+// Draw to the screen
+internal void
+draw( SDL_Window*     window,
+      SDL_Renderer*   renderer,
+      const GameState gameState )
+{
+        Player player = gameState.player;
+        Camera camera = gameState.camera;
+        
+        //Clear screen
+        setRenderDrawColor( renderer, 0.0, 0.0, 0.0, 1.0 );
+        SDL_RenderClear( renderer );
+
+        drawBackground( renderer, gameState );
+        
+        // Draw player
+        V2 playerCenter = { player.size.x / 2, player.size.y };
+        drawRectangle( renderer,
+                       player.position - camera.position - playerCenter,
+                       player.size,
+                       1.0, 1.0, 0.0, 1.0 );
+        
+        //Update screen
+        SDL_RenderPresent( renderer );
 }
 
 int32 main( int32 argc, char** argv )
@@ -341,72 +420,108 @@ int32 main( int32 argc, char** argv )
         }
 
 
-        Player player = {
-                160, 200, // position (map coordinates)
-                0, 0, // velocity
-                30, 50 // size
-        };
+        Player player;
+        player.tileMapX = 0;
+        player.tileMapY = 0;
+        player.position = { 160, 200 }; // (map coordinates)
+        player.velocity = { 0, 0 };
+        player.size     = { 30, 50 };
 
-        Camera camera = {
-                0, 0, // position (map coordinates)
-                SCREEN_WIDTH, SCREEN_HEIGHT // size
-        };
+        Camera camera;
+        camera.position = { 0, 0 }; // (map coordinates)
+        camera.size     = { SCREEN_WIDTH, SCREEN_HEIGHT };
 
         // Tilemap
-        uint32 tiles1[TILE_MAP_ROWS][TILE_MAP_COLS] =
+        const uint32 TILE_MAP_ROWS = 12;
+        const uint32 TILE_MAP_COLS = 16;
+        
+        uint32 tiles00[TILE_MAP_ROWS][TILE_MAP_COLS] =
                 {
-                        { 1, 1, 1, 1,  1, 0, 0, 0,  1, 1, 1, 1,  1, 1, 1, 1 },
+                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 0 },
+                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 0 },
                         { 0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  1, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-
+                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 }
+                };
+        uint32 tiles01[TILE_MAP_ROWS][TILE_MAP_COLS] =
+                {
                         { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 0, 0,  1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0 },
+                        { 1, 0, 0, 0,  1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 1, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-
-                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 1, 1, 1 },
+                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 0,  0, 0, 0, 1 }
+                };
+        uint32 tiles10[TILE_MAP_ROWS][TILE_MAP_COLS] =
+                {
+                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 0, 0,  0, 1, 1, 1,  1, 1, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 1, 1, 1,  1, 1, 0, 0,  0, 0, 0, 1 },
                         { 0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
                         { 0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
-                        { 0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1, 1, 0, 1 },
+                        { 1, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1, 1, 0, 1 },
                         { 1, 0, 0, 0,  1, 1, 1, 0,  1, 1, 0, 1,  1, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1 }
+                        { 1, 0, 0, 1,  1, 1, 1, 1,  1, 1, 0, 0,  1, 1, 1, 1 }
+                };
+        uint32 tiles11[TILE_MAP_ROWS][TILE_MAP_COLS] =
+                {
+                        { 1, 0, 0, 1,  1, 1, 1, 1,  1, 1, 0, 0,  1, 1, 1, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 0, 0, 1, 1,  0, 1, 0, 0,  1, 1, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 1, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
+                        { 1, 0, 1, 0,  1, 1, 0, 1,  0, 1, 0, 0,  0, 1, 0, 1 },
+                        { 1, 0, 1, 0,  0, 0, 0, 1,  0, 1, 0, 0,  1, 1, 0, 1 },
+                        { 1, 0, 0, 0,  1, 1, 1, 1,  1, 1, 0, 1,  1, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 }
                 };
         
-        TileMap tileMap1 = {
-                TILE_SIZE,
-                TILE_MAP_ROWS,
-                TILE_MAP_COLS,
-                (uint32*)tiles1
-        };
-        
+        TileMap tileMaps[2][2];
+
+        tileMaps[0][0].tiles = (uint32*)tiles00;
+        tileMaps[1][0].tiles = (uint32*)tiles01;
+        tileMaps[0][1].tiles = (uint32*)tiles10;
+        tileMaps[1][1].tiles = (uint32*)tiles11;
+
+        World world;
+        world.tileSideInMeters = 1.4f;
+        world.tileSideInPixels = 64;
+        world.countX = 2;
+        world.countY = 2;
+        world.tileMaps = (TileMap*)tileMaps;
+        world.tileMapCountX = TILE_MAP_COLS;
+        world.tileMapCountY = TILE_MAP_ROWS;
+
+        // printf("%d %d %d\n",
+        //        world.tileMaps[0].tiles[0],
+        //        world.tileMaps[0].tiles[1],
+        //        world.tileMaps[0].tiles[2]);
+
         GameState gameState;
         gameState.player = player;
         gameState.camera = camera;
-        gameState.tileMap = tileMap1;
-
+        gameState.world = &world;
+        
         // While running
         bool quit = false;
 

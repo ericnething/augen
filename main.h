@@ -24,14 +24,24 @@ typedef int32_t bool32;
 
 #define internal static
 #define local_persist static
-#define global_persist static
+#define global_variable static
 
 struct TileMap
 {
-        real32  tileSize;
-        int32   rows;
-        int32   cols;
         uint32* tiles;
+};
+
+struct World
+{
+        real32 tileSideInMeters;
+        uint32 tileSideInPixels;
+
+        int32 countX;
+        int32 countY;
+        
+        TileMap* tileMaps;
+        int32 tileMapCountX;
+        int32 tileMapCountY;
 };
 
 struct V2
@@ -41,6 +51,8 @@ struct V2
 
 struct Player
 {
+        uint32 tileMapX;
+        uint32 tileMapY;
         V2 position;
         V2 velocity;
         V2 size;
@@ -56,7 +68,7 @@ struct GameState
 {
         Player player;
         Camera camera;
-        TileMap tileMap;
+        World* world;
 };
 
 inline V2
@@ -177,3 +189,6 @@ truncateReal32ToInt32( real32 a )
         int32 result = (int32)a;
         return result;
 }
+
+// For use in development
+#define assert(expression) if(!(expression)) {*(int *)0 = 0;}
