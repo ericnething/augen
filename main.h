@@ -26,6 +26,29 @@ typedef int32_t bool32;
 #define local_persist static
 #define global_variable static
 
+struct V2
+{
+        real32 x, y;
+};
+
+struct CanonicalPosition
+{
+        uint32 tileMapX;
+        uint32 tileMapY;
+        uint32 tileX;
+        uint32 tileY;
+        real32 tileRelX;
+        real32 tileRelY;
+};
+
+struct RawPosition
+{
+        uint32 tileMapX;
+        uint32 tileMapY;
+        real32 x;
+        real32 y;
+};
+
 struct TileMap
 {
         uint32* tiles;
@@ -42,11 +65,6 @@ struct World
         TileMap* tileMaps;
         int32 tileMapCountX;
         int32 tileMapCountY;
-};
-
-struct V2
-{
-        real32 x, y;
 };
 
 struct Player
@@ -154,14 +172,6 @@ operator<( V2 a, V2 b )
         return result;
 }
 
-inline real32
-square( real32 a )
-{
-        real32 result;
-        result = a * a;
-        return result;
-}
-
 inline uint8
 colorReal32ToUint8( real32 color )
 {
@@ -169,26 +179,6 @@ colorReal32ToUint8( real32 color )
         return result;
 }
 
-inline int32
-roundReal32ToInt32( real32 a )
-{
-        int32 result = (int32)(a + 0.5f);
-        return result;
-}
-
-inline uint32
-roundReal32ToUInt32( real32 a )
-{
-        uint32 result = (uint32)(a + 0.5f);
-        return result;
-}
-
-inline int32
-truncateReal32ToInt32( real32 a )
-{
-        int32 result = (int32)a;
-        return result;
-}
-
 // For use in development
 #define assert(expression) if(!(expression)) {*(int *)0 = 0;}
+

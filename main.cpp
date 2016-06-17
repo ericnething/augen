@@ -1,126 +1,8 @@
 #include "main.h"
+#include "intrinsics.h"
+#include "sdl.h"
 
-const int32 SCREEN_WIDTH = 1920/2;
-const int32 SCREEN_HEIGHT = 1080/2;
 const real32 TILE_SIZE = 64;
-
-// Initialize SDL and create window
-SDL_Window*
-initializeSDL()
-{
-        // Initialize SDL
-        bool initStatus = SDL_Init( SDL_INIT_VIDEO );
-        if ( initStatus < 0 )
-        {
-                printf( "SDL could not be initialized. SDL_Error: %s\n",
-                        SDL_GetError() );
-        }
-
-        // Create window
-        SDL_Window* window = SDL_CreateWindow( "SDL Tutorial", 0, 0,
-                                    SCREEN_WIDTH, SCREEN_HEIGHT,
-                                    SDL_WINDOW_SHOWN );
-
-        return window;
-}
-
-// Create renderer
-SDL_Renderer*
-createRenderer( SDL_Window *window )
-{
-        // Create renderer for window
-        SDL_Renderer* renderer =
-                SDL_CreateRenderer( window, -1,
-                                    SDL_RENDERER_ACCELERATED |
-                                    SDL_RENDERER_PRESENTVSYNC );
-
-        return renderer;
-}
-
-// Shutdown SDL
-void
-shutdownSDL( SDL_Window* window,
-             SDL_Renderer* renderer )
-{
-        // Destroy window and renderer
-        SDL_DestroyRenderer( renderer );
-        SDL_DestroyWindow( window );
-
-        // Quit SDL Subsystems
-        SDL_Quit();
-}
-
-// Load a surface from a file
-SDL_Surface*
-loadSurface( std::string path )
-{
-        // Load image from path
-        SDL_Surface* loadedSurface = SDL_LoadBMP( path.c_str() );
-        if ( loadedSurface == NULL )
-        {
-                printf( "Unable to load image %s. SDL Error: %s\n",
-                        path.c_str(), SDL_GetError() );
-        }
-
-        return loadedSurface;
-}
-
-// Handle events on the queue
-bool
-parseEvents()
-{
-        SDL_Event event;
-        bool quit = true;
-
-        while ( SDL_PollEvent( &event ) != 0 )
-        {
-                // Quit event
-                if ( event.type == SDL_QUIT )
-                {
-                        return quit;
-                }
-                else if ( event.type == SDL_KEYDOWN )
-                {
-                        if ( event.key.keysym.sym == SDLK_ESCAPE )
-                        {
-                                return quit;
-                        }
-                }
-        }
-        
-        return !quit;
-}
-
-internal void
-setRenderDrawColor( SDL_Renderer* renderer,
-                    real32 colorR,
-                    real32 colorG,
-                    real32 colorB,
-                    real32 colorA )
-{
-        uint8 R = colorReal32ToUint8( colorR );
-        uint8 G = colorReal32ToUint8( colorG );
-        uint8 B = colorReal32ToUint8( colorB );
-        uint8 A = colorReal32ToUint8( colorA );
-
-        SDL_SetRenderDrawColor( renderer, R, G, B, A );
-}
-
-internal void
-drawRectangle( SDL_Renderer* renderer,
-               V2 position,
-               V2 size,
-               real32 colorR,
-               real32 colorG,
-               real32 colorB,
-               real32 colorA )
-{
-        SDL_Rect rectangle = { (int32)position.x, (int32)position.y,
-                               (int32)size.x, (int32)size.y };
-        
-        setRenderDrawColor( renderer, colorR, colorG, colorB, colorA );
-        SDL_RenderFillRect( renderer, &rectangle );
-}
 
 internal TileMap*
 getTileMap( World* world,
@@ -155,14 +37,15 @@ getTileValueUnchecked( World*   world,
 internal bool32
 isTileMapPointEmpty( World*   world,
                      TileMap* tileMap,
-                     V2       testPoint)
+                     uint32   tileX,
+                     uint32   tileY)
 {
         bool32 isEmpty = false;
 
         if (tileMap)
         {
-                int32 tileX = truncateReal32ToInt32(testPoint.x / world->tileSideInPixels);
-                int32 tileY = truncateReal32ToInt32(testPoint.y / world->tileSideInPixels);
+                // int32 tileX = truncateReal32ToInt32(testTileX / world->tileSideInPixels);
+                // int32 tileY = truncateReal32ToInt32(testTileY / world->tileSideInPixels);
         
                 if ((tileX >= 0) && (tileX < world->tileMapCountX) &&
                     (tileY >= 0) && (tileY < world->tileMapCountY))
@@ -174,43 +57,64 @@ isTileMapPointEmpty( World*   world,
         return isEmpty;
 }
 
+inline CanonicalPosition
+getCanonicalPosition(World* world, RawPosition pos)
+{
+        CanonicalPosition result;
+        result.tileMapX = pos.tileMapX;
+        result.tileMapY = pos.tileMapY;
+
+        real32 x = pos.x;
+        real32 y = pos.y;
+        
+        result.tileX = floorReal32ToInt32( x / world->tileSideInPixels );
+        result.tileY = floorReal32ToInt32( y / world->tileSideInPixels );
+
+        result.tileRelX = x - result.tileX * world->tileSideInPixels;
+        result.tileRelY = y - result.tileY * world->tileSideInPixels;
+
+        //printf("TileRelative (%f, %f)\n", result.tileRelX, result.tileRelY);
+        assert(result.tileRelX >= 0);
+        assert(result.tileRelY >= 0);
+        assert(result.tileRelX < world->tileSideInPixels);
+        assert(result.tileRelY < world->tileSideInPixels);
+        
+        if (result.tileX < 0)
+        {
+                result.tileX = world->tileMapCountX + result.tileX;
+                --result.tileMapX;
+        }
+        if (result.tileY < 0)
+        {
+                result.tileY = world->tileMapCountY + result.tileY;
+                --result.tileMapY;
+        }
+        if (result.tileX >= world->tileMapCountX)
+        {
+                result.tileX = result.tileX - world->tileMapCountX;
+                ++result.tileMapX;
+        }
+        if (result.tileY >= world->tileMapCountY)
+        {
+                result.tileY = result.tileY - world->tileMapCountY;
+                ++result.tileMapY;
+        }
+        return result;
+}
+
+
 internal bool32
-isWorldPointEmpty( World* world,
-                   uint32 testTileMapX,
-                   uint32 testTileMapY,
-                   V2     testPoint )
+isWorldPointEmpty( World* world, RawPosition testPos )
 {
         bool32 isEmpty = false;
-
-        int32 testTileX = truncateReal32ToInt32(testPoint.x / world->tileSideInPixels);
-        int32 testTileY = truncateReal32ToInt32(testPoint.y / world->tileSideInPixels);
-
-        if (testTileX < 0)
-        {
-                testTileX = world->tileMapCountX + testTileX;
-                --testTileMapX;
-        }
-        if (testTileY < 0)
-        {
-                testTileY = world->tileMapCountY + testTileY;
-                --testTileMapX;
-        }
-        if (testTileX >= world->tileMapCountX)
-        {
-                testTileX = testTileX - world->tileMapCountX;
-                ++testTileMapX;
-        }
-        if (testTileY >= world->tileMapCountY)
-        {
-                testTileY = testTileY - world->tileMapCountY;
-                ++testTileMapX;
-        }
-
-        TileMap* tileMap = getTileMap(world, testTileMapX, testTileMapY);
-                
+        CanonicalPosition canonicalPosition = getCanonicalPosition(world, testPos);
+        TileMap* tileMap = getTileMap(world, canonicalPosition.tileMapX,
+                                             canonicalPosition.tileMapY);
         if (tileMap)
         {
-                isEmpty = isTileMapPointEmpty(world, tileMap, testPoint);
+                isEmpty = isTileMapPointEmpty(world, tileMap,
+                                              canonicalPosition.tileX,
+                                              canonicalPosition.tileY);
         }
         return isEmpty;
 }
@@ -253,8 +157,7 @@ updateCamera( GameState gameState )
 }
 
 internal Player
-updatePlayer( GameState gameState,
-              real32 dt )
+updatePlayer( GameState gameState, real32 dt )
 {
         World* world = gameState.world;
         Player player = gameState.player;
@@ -295,14 +198,29 @@ updatePlayer( GameState gameState,
         // Check if the move is valid
         // V2 newPosition = player.position + (square(dt) * 0.5 * dPlayer) + player.velocity;
         V2 newPosition = player.position + (dt * dPlayer);
-        V2 newPositionLeftSide = { newPosition.x - (0.5f * player.size.x), newPosition.y };
-        V2 newPositionRightSide = { newPosition.x + (0.5f * player.size.x), newPosition.y };
+        printf("New Player position (%f, %f)\n", newPosition.x, newPosition.y);
+        RawPosition newPlayerPos = {
+                player.tileMapX, player.tileMapY,
+                newPosition.x, newPosition.y
+        };
+        RawPosition newPlayerLeft = newPlayerPos;
+        newPlayerLeft.x = newPosition.x - (0.5f * player.size.x);
+        RawPosition newPlayerRight = newPlayerPos;
+        newPlayerRight.x = newPosition.x + (0.5f * player.size.x);
         
-        if (isWorldPointEmpty(world, player.tileMapX, player.tileMapY, newPositionLeftSide) &&
-            isWorldPointEmpty(world, player.tileMapX, player.tileMapY, newPositionRightSide) &&
-            isWorldPointEmpty(world, player.tileMapX, player.tileMapY, newPosition))
+        if (isWorldPointEmpty(world, newPlayerLeft) &&
+            isWorldPointEmpty(world, newPlayerRight) &&
+            isWorldPointEmpty(world, newPlayerPos))
         {
-                player.position = newPosition;
+                CanonicalPosition canonicalPos
+                        = getCanonicalPosition(world, newPlayerPos);
+
+                player.tileMapX = canonicalPos.tileMapX;
+                player.tileMapY = canonicalPos.tileMapY;
+                
+                player.position.x = (canonicalPos.tileX * world->tileSideInPixels) + canonicalPos.tileRelX;
+                player.position.y = (canonicalPos.tileY * world->tileSideInPixels) + canonicalPos.tileRelY;
+                
                 player.velocity += dt * dPlayer;
         }
 
@@ -375,9 +293,7 @@ drawBackground( SDL_Renderer*   renderer,
 
 // Draw to the screen
 internal void
-draw( SDL_Window*     window,
-      SDL_Renderer*   renderer,
-      const GameState gameState )
+draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
 {
         Player player = gameState.player;
         Camera camera = gameState.camera;
@@ -463,7 +379,7 @@ int32 main( int32 argc, char** argv )
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
                         { 1, 0, 0, 0,  0, 0, 1, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 0,  0, 0, 0, 1 }
+                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 }
                 };
         uint32 tiles10[TILE_MAP_ROWS][TILE_MAP_COLS] =
                 {
@@ -549,12 +465,15 @@ int32 main( int32 argc, char** argv )
                 SDL_Delay( 1000 / 60 );
                 
                 consoleCounter++;
-                if (consoleCounter >= 60)
+                if (consoleCounter >= 10)
                 {
                         consoleCounter = 0;
                         printf("Player (%f, %f)\n",
                                gameState.player.position.x,
                                gameState.player.position.y);
+                        printf("PlayerTile (%d, %d)\n",
+                               gameState.player.tileMapX,
+                               gameState.player.tileMapY);
                         printf("Camera (%f, %f)\n",
                                gameState.camera.position.x,
                                gameState.camera.position.y);
