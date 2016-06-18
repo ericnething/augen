@@ -2,7 +2,7 @@
 #include "intrinsics.h"
 #include "sdl.h"
 
-const real32 TILE_SIZE = 10.0f;
+const real32 TILE_SIZE = 64.0f;
 
 internal WorldPosition
 recanonicalizePosition(World* world, WorldPosition pos)
@@ -66,9 +66,10 @@ internal V2
 getScreenCoordinates(World* world, WorldPosition pos)
 {
         real32 tileSize = world->tileSideInPixels;
+        real32 offsetForRightHandCoordinates = SCREEN_HEIGHT;
         V2 screenCoordinates = {
                 tileSize * pos.tileX + pos.relative.x * world->metersToPixels,
-                tileSize * pos.tileY + pos.relative.y * world->metersToPixels,
+                offsetForRightHandCoordinates - (tileSize * pos.tileY + pos.relative.y * world->metersToPixels)
         };
         return screenCoordinates;
 }
@@ -95,13 +96,21 @@ updateCamera( GameState gameState )
                 differenceInPosition = recanonicalizePosition(gameState.world, differenceInPosition);
                 V2 origin = getScreenCoordinates(gameState.world, differenceInPosition);
                 
-                if (origin > screenSize)
+                if (origin.x > screenSize.x)
                 {
-                        camera.position.relative += screenSize;
+                        camera.position.relative.x += (1/gameState.world->metersToPixels) * screenSize.x;
                 }
-                if (origin < (-1)*player.size)
+                if (origin.y > screenSize.y)
                 {
-                        camera.position.relative += (-1)*screenSize;
+                        camera.position.relative.y += (1/gameState.world->metersToPixels) * screenSize.y;
+                }
+                if (origin.x < (-1/2)*player.size.x)
+                {
+                        camera.position.relative.x += (1/gameState.world->metersToPixels) * (-1)*screenSize.x;
+                }
+                if (origin.y < (-1)*player.size.y)
+                {
+                        camera.position.relative.y += (1/gameState.world->metersToPixels) * (-1)*screenSize.y;
                 }
         }
         camera.position = recanonicalizePosition(gameState.world, camera.position);
@@ -122,11 +131,11 @@ updatePlayer( GameState gameState, real32 dt )
 
         if ( keystate[ SDL_SCANCODE_W ] ) // Up
         {
-                dPlayer.y += -1.0f;
+                dPlayer.y += 1.0f;
         }
         if ( keystate[ SDL_SCANCODE_S ] ) // Down
         {
-                dPlayer.y += 1.0f;
+                dPlayer.y += -1.0f;
         }
         if ( keystate[ SDL_SCANCODE_A ] ) // Left
         {
@@ -136,6 +145,15 @@ updatePlayer( GameState gameState, real32 dt )
         {
                 dPlayer.x += 1.0f;
         }
+
+        // if ( keystate[ SDL_SCANCODE_UP ] ) // Zoom in
+        // {
+        //         world->tileSideInPixels += 1.0f;
+        // }
+        // if ( keystate[ SDL_SCANCODE_DOWN ] ) // Zoom out
+        // {
+        //         world->tileSideInPixels -= 1.0f;
+        // }
 
         real32 speed = 4.0;
         dPlayer = speed * dPlayer;
@@ -238,6 +256,8 @@ drawBackground( SDL_Renderer*   renderer,
                         differenceInPosition = recanonicalizePosition(world, differenceInPosition);
                         V2 origin = getScreenCoordinates(world, differenceInPosition);
 
+                        origin.y -= tileSize;
+
                         if ( origin > (-1)*size && origin < screenSize)
                         {
                                 drawRectangle( renderer, origin, size, color, color, color, 1.0 );
@@ -260,7 +280,7 @@ draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
         drawBackground( renderer, gameState );
         
         // Draw player
-        V2 playerCenter = { player.size.x / 2, player.size.y };
+        V2 playerCenter = { player.size.x / 2, -player.size.y };
         player.position.relative = player.position.relative - playerCenter;
 
         WorldPosition differenceInPosition = player.position - camera.position;
