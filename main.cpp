@@ -2,12 +2,12 @@
 #include "intrinsics.h"
 #include "sdl.h"
 
-const real32 TILE_SIZE = 64.0f;
+const real32 TILE_SIZE = 10.0f;
 
 internal WorldPosition
 recanonicalizePosition(World* world, WorldPosition pos)
 {
-        real32 tileSize = world->tileSideInPixels;
+        real32 tileSize = world->tileSideInMeters;
         
         if (pos.relative.x < 0)
         {
@@ -67,8 +67,8 @@ getScreenCoordinates(World* world, WorldPosition pos)
 {
         real32 tileSize = world->tileSideInPixels;
         V2 screenCoordinates = {
-                tileSize * pos.tileX + pos.relative.x,
-                tileSize * pos.tileY + pos.relative.y,
+                tileSize * pos.tileX + pos.relative.x * world->metersToPixels,
+                tileSize * pos.tileY + pos.relative.y * world->metersToPixels,
         };
         return screenCoordinates;
 }
@@ -86,7 +86,7 @@ updateCamera( GameState gameState )
         if ( scrollingType == 0 )
         {
                 camera.position = player.position;
-                camera.position.relative += (-0.5f)*screenSize;
+                camera.position.relative += (1/gameState.world->metersToPixels) * (-0.5f)*screenSize;
         }
         // Scroll by a fixed amount (full screen size)
         else if ( scrollingType == 1 )
@@ -113,7 +113,7 @@ updatePlayer( GameState gameState, real32 dt )
 {
         World* world = gameState.world;
         Player player = gameState.player;
-        uint32 tileSize = world->tileSideInPixels;
+        uint32 tileSize = world->tileSideInMeters;
         
         const real32 VELOCITY_CONSTANT = 0.7071067811865476;
         const uint8* keystate = SDL_GetKeyboardState( NULL );
@@ -137,7 +137,7 @@ updatePlayer( GameState gameState, real32 dt )
                 dPlayer.x += 1.0f;
         }
 
-        real32 speed = 250.0;
+        real32 speed = 4.0;
         dPlayer = speed * dPlayer;
         
         if (dPlayer.x != 0.0f && dPlayer.y != 0.0f)
@@ -266,8 +266,10 @@ draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
         WorldPosition differenceInPosition = player.position - camera.position;
         differenceInPosition = recanonicalizePosition(gameState.world, differenceInPosition);
         V2 origin = getScreenCoordinates(gameState.world, differenceInPosition);
+
+        V2 size = gameState.world->metersToPixels * player.size;
         
-        drawRectangle( renderer, origin, player.size, 1.0, 1.0, 0.0, 1.0 );
+        drawRectangle( renderer, origin, size, 1.0, 1.0, 0.0, 1.0 );
         
         //Update screen
         SDL_RenderPresent( renderer );
@@ -292,19 +294,6 @@ int32 main( int32 argc, char** argv )
                         SDL_GetError() );
                 return 0;
         }
-
-
-        Player player;
-        player.position.tileX = 2;
-        player.position.tileY = 2;
-        player.position.relative = { 10.0f, 30.0f };
-        player.velocity = { 0.0f, 0.0f };
-        player.size     = { 0.46875f * TILE_SIZE, 0.78125f * TILE_SIZE };
-
-        Camera camera;
-        camera.position = player.position;
-        camera.position.relative = { 0.0f, 0.0f };
-        camera.size = { SCREEN_WIDTH, SCREEN_HEIGHT };
 
         // Tilemap
         const uint32 TILE_MAP_ROWS = 24;
@@ -346,10 +335,23 @@ int32 main( int32 argc, char** argv )
         World world;
         world.tileSideInMeters = 1.4f;
         world.tileSideInPixels = TILE_SIZE;
+        world.metersToPixels = world.tileSideInPixels / world.tileSideInMeters;
         world.tileMap = &tempTileMap;
         world.tileCountX = TILE_MAP_COLS;
         world.tileCountY = TILE_MAP_ROWS;
+        
+        Player player;
+        player.position.tileX = 2;
+        player.position.tileY = 2;
+        player.position.relative = { 0.2f, 0.5f };
+        player.velocity = { 0.0f, 0.0f };
+        player.size     = { 0.46875f * world.tileSideInMeters, 0.78125f * world.tileSideInMeters };
 
+        Camera camera;
+        camera.position = player.position;
+        camera.position.relative = { 0.0f, 0.0f };
+        camera.size = { SCREEN_WIDTH, SCREEN_HEIGHT };
+        
         GameState gameState;
         gameState.player = player;
         gameState.camera = camera;
