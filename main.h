@@ -31,22 +31,11 @@ struct V2
         real32 x, y;
 };
 
-struct CanonicalPosition
+struct WorldPosition
 {
-        uint32 tileMapX;
-        uint32 tileMapY;
         uint32 tileX;
         uint32 tileY;
-        real32 tileRelX;
-        real32 tileRelY;
-};
-
-struct RawPosition
-{
-        uint32 tileMapX;
-        uint32 tileMapY;
-        real32 x;
-        real32 y;
+        V2 relative;
 };
 
 struct TileMap
@@ -59,19 +48,15 @@ struct World
         real32 tileSideInMeters;
         uint32 tileSideInPixels;
 
-        int32 countX;
-        int32 countY;
+        int32 tileCountX;
+        int32 tileCountY;
         
-        TileMap* tileMaps;
-        int32 tileMapCountX;
-        int32 tileMapCountY;
+        TileMap* tileMap;
 };
 
 struct Player
 {
-        uint32 tileMapX;
-        uint32 tileMapY;
-        V2 position;
+        WorldPosition position;
         V2 velocity;
         V2 size;
 };
@@ -104,7 +89,6 @@ inline V2 &
 operator+=( V2 &a, V2 b )
 {
         a = a + b;
-
         return a;
 }
 
@@ -134,7 +118,7 @@ inline V2
 operator/( V2 a, real32 b )
 {
         V2 result;
-
+        
         result.x = a.x / b;
         result.y = a.y / b;
         
@@ -145,7 +129,6 @@ inline V2 &
 operator*=( V2 &a, real32 b )
 {
         a = b * a;
-
         return a;
 }
 
@@ -153,22 +136,17 @@ inline bool
 operator>( V2 a, V2 b )
 {
         bool result = false;
-
         if (a.x > b.x && a.y > b.y)
         {
                 result = true;
         }
-                
         return result;
 }
 
 inline bool
 operator<( V2 a, V2 b )
 {
-        bool result;
-
-        result = b > a;
-                
+        bool result = b > a;
         return result;
 }
 

@@ -4,150 +4,37 @@
 
 const real32 TILE_SIZE = 64;
 
-internal TileMap*
-getTileMap( World* world,
-            int32 tileMapX,
-            int32 tileMapY )
-{
-        TileMap* tileMap = 0;
-        
-        if ((tileMapX >= 0) && (tileMapX < world->countX) &&
-            (tileMapY >= 0) && (tileMapY < world->countY))
-        {
-                tileMap = &world->tileMaps[(tileMapY * world->countX) + tileMapX];
-        }
-
-        return tileMap;
-}
-
-internal uint32
-getTileValueUnchecked( World*   world,
-                       TileMap* tileMap,
-                       uint32   tileX,
-                       uint32   tileY)
-{
-        assert(tileMap);
-        assert((tileX >= 0) && (tileX < world->tileMapCountX) &&
-               (tileY >= 0) && (tileY < world->tileMapCountY));
-
-        uint32 tileValue = tileMap->tiles[(tileY * world->tileMapCountX) + tileX];
-        return tileValue;
-}
-
-internal bool32
-isTileMapPointEmpty( World*   world,
-                     TileMap* tileMap,
-                     uint32   tileX,
-                     uint32   tileY)
-{
-        bool32 isEmpty = false;
-
-        if (tileMap)
-        {
-                // int32 tileX = truncateReal32ToInt32(testTileX / world->tileSideInPixels);
-                // int32 tileY = truncateReal32ToInt32(testTileY / world->tileSideInPixels);
-        
-                if ((tileX >= 0) && (tileX < world->tileMapCountX) &&
-                    (tileY >= 0) && (tileY < world->tileMapCountY))
-                {
-                        uint32 tileValue = getTileValueUnchecked(world, tileMap, tileX, tileY);
-                        isEmpty = (tileValue == 0);
-                }
-        }
-        return isEmpty;
-}
-
-inline CanonicalPosition
-getCanonicalPosition(World* world, RawPosition pos)
-{
-        CanonicalPosition result;
-        result.tileMapX = pos.tileMapX;
-        result.tileMapY = pos.tileMapY;
-
-        real32 x = pos.x;
-        real32 y = pos.y;
-        
-        result.tileX = floorReal32ToInt32( x / world->tileSideInPixels );
-        result.tileY = floorReal32ToInt32( y / world->tileSideInPixels );
-
-        result.tileRelX = x - result.tileX * world->tileSideInPixels;
-        result.tileRelY = y - result.tileY * world->tileSideInPixels;
-
-        //printf("TileRelative (%f, %f)\n", result.tileRelX, result.tileRelY);
-        assert(result.tileRelX >= 0);
-        assert(result.tileRelY >= 0);
-        assert(result.tileRelX < world->tileSideInPixels);
-        assert(result.tileRelY < world->tileSideInPixels);
-        
-        if (result.tileX < 0)
-        {
-                result.tileX = world->tileMapCountX + result.tileX;
-                --result.tileMapX;
-        }
-        if (result.tileY < 0)
-        {
-                result.tileY = world->tileMapCountY + result.tileY;
-                --result.tileMapY;
-        }
-        if (result.tileX >= world->tileMapCountX)
-        {
-                result.tileX = result.tileX - world->tileMapCountX;
-                ++result.tileMapX;
-        }
-        if (result.tileY >= world->tileMapCountY)
-        {
-                result.tileY = result.tileY - world->tileMapCountY;
-                ++result.tileMapY;
-        }
-        return result;
-}
-
-
-internal bool32
-isWorldPointEmpty( World* world, RawPosition testPos )
-{
-        bool32 isEmpty = false;
-        CanonicalPosition canonicalPosition = getCanonicalPosition(world, testPos);
-        TileMap* tileMap = getTileMap(world, canonicalPosition.tileMapX,
-                                             canonicalPosition.tileMapY);
-        if (tileMap)
-        {
-                isEmpty = isTileMapPointEmpty(world, tileMap,
-                                              canonicalPosition.tileX,
-                                              canonicalPosition.tileY);
-        }
-        return isEmpty;
-}
-
 internal Camera
 updateCamera( GameState gameState )
 {
         Camera camera = gameState.camera;
         Player player = gameState.player;
+        real32 tileSize = gameState.world->tileSideInPixels;
+        
         int32 scrollingType = 0;
 
         // Smooth scrolling
         if ( scrollingType == 0 )
         {
-                camera.position.x = player.position.x - (SCREEN_WIDTH/2);
-                camera.position.y = player.position.y - (SCREEN_HEIGHT/2);
+                camera.position.x = player.position.tileX * tileSize + player.position.relative.x - (SCREEN_WIDTH/2);
+                camera.position.y = player.position.tileY * tileSize + player.position.relative.y - (SCREEN_HEIGHT/2);
         }
         // Scroll by a fixed amount (full screen size)
         else if ( scrollingType == 1 )
         {
-                if (player.position.x - camera.position.x > SCREEN_WIDTH)
+                if (player.position.relative.x - camera.position.x > SCREEN_WIDTH)
                 {
                         camera.position.x += SCREEN_WIDTH;
                 }
-                if (player.position.x - camera.position.x < -player.size.x)
+                if (player.position.relative.x - camera.position.x < -player.size.x)
                 {
                         camera.position.x -= SCREEN_WIDTH;
                 }
-                if (player.position.y - camera.position.y > SCREEN_HEIGHT)
+                if (player.position.relative.y - camera.position.y > SCREEN_HEIGHT)
                 {
                         camera.position.y += SCREEN_HEIGHT;
                 }
-                if (player.position.y - camera.position.y < -player.size.y)
+                if (player.position.relative.y - camera.position.y < -player.size.y)
                 {
                         camera.position.y -= SCREEN_HEIGHT;
                 }
@@ -156,12 +43,67 @@ updateCamera( GameState gameState )
         return camera;
 }
 
+internal WorldPosition
+recanonicalizePosition(World* world, WorldPosition pos)
+{
+        real32 tileSize = (real32)world->tileSideInPixels;
+        
+        if (pos.relative.x < 0)
+        {
+                --pos.tileX;
+                pos.relative.x += tileSize;
+        }
+        if (pos.relative.x >= tileSize)
+        {
+                ++pos.tileX;
+                pos.relative.x -= tileSize;
+        }
+        if (pos.relative.y < 0)
+        {
+                --pos.tileY;
+                pos.relative.y += tileSize;
+        }
+        if (pos.relative.y >= tileSize)
+        {
+                ++pos.tileY;
+                pos.relative.y -= tileSize;
+        }
+        return pos;
+}
+
+internal uint32
+getTileValue(World* world, WorldPosition pos)
+{
+        if ((pos.tileX < 0 || pos.tileX >= world->tileCountX) ||
+            (pos.tileY < 0 || pos.tileY >= world->tileCountY))
+        {
+                // Invalid position. Out of bounds.
+                return 1;
+        }
+        uint32 tileValue = world->tileMap->tiles[ pos.tileY * world->tileCountX + pos.tileX ];
+        return tileValue;
+}
+
+internal bool32
+isTileEmpty(World* world, WorldPosition pos)
+{
+        bool32 isEmpty = false;
+        uint32 tileValue = getTileValue(world, pos);
+        
+        if (tileValue == 0)
+        {
+                isEmpty = true;
+        }
+        return isEmpty;
+}
+
 internal Player
 updatePlayer( GameState gameState, real32 dt )
 {
         World* world = gameState.world;
         Player player = gameState.player;
-        const TileMap* tileMap = getTileMap(gameState.world, player.tileMapX, player.tileMapY);
+        uint32 tileSize = world->tileSideInPixels;
+        
         const real32 VELOCITY_CONSTANT = 0.7071067811865476;
         const uint8* keystate = SDL_GetKeyboardState( NULL );
 
@@ -184,7 +126,7 @@ updatePlayer( GameState gameState, real32 dt )
                 dPlayer.x += 1.0f;
         }
 
-        real32 speed = 180.0;
+        real32 speed = 250.0;
         dPlayer = speed * dPlayer;
         
         if (dPlayer.x != 0.0f && dPlayer.y != 0.0f)
@@ -193,34 +135,30 @@ updatePlayer( GameState gameState, real32 dt )
         }
 
         // Friction force
-        //dPlayer += -8.0 * player.velocity;
+        // dPlayer += -10.0 * player.velocity;
+        
+        // V2 newRelativePosition = player.position.relative + (square(dt) * 0.5 * dPlayer) + player.velocity;
+        V2 newRelativePosition = player.position.relative + dt*dPlayer;
+        
+        WorldPosition newPosition = player.position;
+        newPosition.relative = newRelativePosition;
+        newPosition = recanonicalizePosition(world, newPosition);
+
+        WorldPosition newPositionLeft = newPosition;
+        newPositionLeft.relative.x -= 0.5f * player.size.x;
+        newPositionLeft = recanonicalizePosition(world, newPositionLeft);
+        
+        WorldPosition newPositionRight = newPosition;
+        newPositionRight.relative.x += 0.5f * player.size.x;
+        newPositionRight = recanonicalizePosition(world, newPositionRight);
 
         // Check if the move is valid
-        // V2 newPosition = player.position + (square(dt) * 0.5 * dPlayer) + player.velocity;
-        V2 newPosition = player.position + (dt * dPlayer);
-        printf("New Player position (%f, %f)\n", newPosition.x, newPosition.y);
-        RawPosition newPlayerPos = {
-                player.tileMapX, player.tileMapY,
-                newPosition.x, newPosition.y
-        };
-        RawPosition newPlayerLeft = newPlayerPos;
-        newPlayerLeft.x = newPosition.x - (0.5f * player.size.x);
-        RawPosition newPlayerRight = newPlayerPos;
-        newPlayerRight.x = newPosition.x + (0.5f * player.size.x);
-        
-        if (isWorldPointEmpty(world, newPlayerLeft) &&
-            isWorldPointEmpty(world, newPlayerRight) &&
-            isWorldPointEmpty(world, newPlayerPos))
+        if (isTileEmpty(world, newPosition) &&
+            isTileEmpty(world, newPositionLeft) &&
+            isTileEmpty(world, newPositionRight))
         {
-                CanonicalPosition canonicalPos
-                        = getCanonicalPosition(world, newPlayerPos);
-
-                player.tileMapX = canonicalPos.tileMapX;
-                player.tileMapY = canonicalPos.tileMapY;
-                
-                player.position.x = (canonicalPos.tileX * world->tileSideInPixels) + canonicalPos.tileRelX;
-                player.position.y = (canonicalPos.tileY * world->tileSideInPixels) + canonicalPos.tileRelY;
-                
+                // set player position and velocity
+                player.position = newPosition;
                 player.velocity += dt * dPlayer;
         }
 
@@ -234,8 +172,6 @@ updateGame( const GameState oldGameState,
 {
         // Update player
         Player player = updatePlayer(oldGameState, dt);
-
-        // int32 playerTileX = truncateReal32ToInt32(player.position.x - )
 
         // Adjust camera
         Camera camera = updateCamera(oldGameState);
@@ -253,39 +189,44 @@ drawBackground( SDL_Renderer*   renderer,
                 const GameState gameState )
 {
         World* world = gameState.world;
+        TileMap* tileMap = world->tileMap;
         Camera camera = gameState.camera;
-        TileMap* tileMap = getTileMap(gameState.world,
-                                      gameState.player.tileMapX,
-                                      gameState.player.tileMapY);
+        Player player = gameState.player;
 
-        assert(tileMap);
-        // printf("TileMapCountY %d\n", world->tileMapCountY);
-        
-        for ( int row = 0; row < world->tileMapCountY; ++row )
+        for (int32 row = 0; row < world->tileCountY; ++row)
         {
-                for ( int col = 0; col < world->tileMapCountX; ++col )
+                for (int32 col = 0; col < world->tileCountX; ++col)
                 {
-                        uint32 tileValue = getTileValueUnchecked(world, tileMap, col, row);
-                        V2 position = {
-                                col * world->tileSideInPixels - camera.position.x,
-                                row * world->tileSideInPixels - camera.position.y
-                        };
-                        V2 size = { (real32)world->tileSideInPixels, (real32)world->tileSideInPixels };
-                        V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
+                        uint32 tileValue = tileMap->tiles[row * world->tileCountX + col];
 
-                        // Only render tiles that are within view of the camera
-                        if ( position > (-1 * size) && position < screenSize )
+                        real32 color = 0.0f;
+
+                        if (tileValue == 0)
                         {
-                                if ( tileValue == 0 )
-                                {
-                                        drawRectangle( renderer, position, size,
-                                                       0.5, 0.5, 0.5, 1.0 );
-                                }
-                                if ( tileValue == 1 )
-                                {
-                                        drawRectangle( renderer, position, size,
-                                                       1.0, 1.0, 1.0, 1.0 );
-                                }
+                                color = 0.5f;
+                        }
+                        if (tileValue == 1)
+                        {
+                                color = 1.0f;
+                        }
+                        if (player.position.tileX == col && player.position.tileY == row)
+                        {
+                                color = 0.0f;
+                        }
+                        
+                        real32 x = (real32)col * world->tileSideInPixels;
+                        real32 y = (real32)row * world->tileSideInPixels;
+                        
+                        V2 position = { x, y };
+                        V2 size = { world->tileSideInPixels, world->tileSideInPixels };
+
+                        V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
+                        V2 origin = { 0, 0 };
+
+                        if (position > (-1)*size && position < (camera.position + camera.size))
+                        {
+                                drawRectangle( renderer, position - camera.position, size,
+                                               color, color, color, 1.0 );
                         }
                 }
         }
@@ -306,8 +247,10 @@ draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
         
         // Draw player
         V2 playerCenter = { player.size.x / 2, player.size.y };
+        V2 playerTile = { player.position.tileX, player.position.tileY };
+        V2 playerScreenPos = player.position.relative + gameState.world->tileSideInPixels * playerTile - playerCenter;
         drawRectangle( renderer,
-                       player.position - camera.position - playerCenter,
+                       playerScreenPos - camera.position,
                        player.size,
                        1.0, 1.0, 0.0, 1.0 );
         
@@ -337,107 +280,65 @@ int32 main( int32 argc, char** argv )
 
 
         Player player;
-        player.tileMapX = 0;
-        player.tileMapY = 0;
-        player.position = { 160, 200 }; // (map coordinates)
-        player.velocity = { 0, 0 };
-        player.size     = { 30, 50 };
+        player.position.tileX = 2;
+        player.position.tileY = 2;
+        player.position.relative = { 10.0f, 30.0f }; // relative position inside tile
+        player.velocity = { 0.0f, 0.0f };
+        player.size     = { 30.0f, 50.0f };
 
         Camera camera;
-        camera.position = { 0, 0 }; // (map coordinates)
+        camera.position = { 0.0f, 0.0f }; // (map coordinates)
         camera.size     = { SCREEN_WIDTH, SCREEN_HEIGHT };
 
         // Tilemap
-        const uint32 TILE_MAP_ROWS = 12;
-        const uint32 TILE_MAP_COLS = 16;
-        
-        uint32 tiles00[TILE_MAP_ROWS][TILE_MAP_COLS] =
-                {
-                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 0 },
-                        { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 0 },
-                        { 0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  1, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1 }
-                };
-        uint32 tiles01[TILE_MAP_ROWS][TILE_MAP_COLS] =
-                {
-                        { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0 },
-                        { 1, 0, 0, 0,  1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 1, 1,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 }
-                };
-        uint32 tiles10[TILE_MAP_ROWS][TILE_MAP_COLS] =
-                {
-                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 1, 1, 1,  1, 1, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
-                        { 0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
-                        { 1, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1, 1, 0, 1 },
-                        { 1, 0, 0, 0,  1, 1, 1, 0,  1, 1, 0, 1,  1, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 1,  1, 1, 1, 1,  1, 1, 0, 0,  1, 1, 1, 1 }
-                };
-        uint32 tiles11[TILE_MAP_ROWS][TILE_MAP_COLS] =
-                {
-                        { 1, 0, 0, 1,  1, 1, 1, 1,  1, 1, 0, 0,  1, 1, 1, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 0, 0, 1, 1,  0, 1, 0, 0,  1, 1, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 1, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
-                        { 1, 0, 1, 0,  1, 1, 0, 1,  0, 1, 0, 0,  0, 1, 0, 1 },
-                        { 1, 0, 1, 0,  0, 0, 0, 1,  0, 1, 0, 0,  1, 1, 0, 1 },
-                        { 1, 0, 0, 0,  1, 1, 1, 1,  1, 1, 0, 1,  1, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
-                        { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 }
-                };
-        
-        TileMap tileMaps[2][2];
+        const uint32 TILE_MAP_ROWS = 24;
+        const uint32 TILE_MAP_COLS = 32;
 
-        tileMaps[0][0].tiles = (uint32*)tiles00;
-        tileMaps[1][0].tiles = (uint32*)tiles01;
-        tileMaps[0][1].tiles = (uint32*)tiles10;
-        tileMaps[1][1].tiles = (uint32*)tiles11;
+        printf("before tempTiles");
+        
+        uint32 tempTiles[TILE_MAP_ROWS][TILE_MAP_COLS] = {
+                
+                { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1,  0, 0, 0, 0,  0, 1, 1, 1,  1, 1, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
+                { 0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1,  0, 0, 0, 1,  1, 0, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0,  1, 1, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  1, 0, 0, 1,  0, 0, 0, 0,  1, 1, 1, 0,  1, 1, 0, 1,  1, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 1,  1, 1, 1, 1,  0, 1, 0, 0,  0, 0, 0, 1 },
+                { 1, 1, 1, 1,  0, 0, 1, 1,  0, 0, 0, 0,  0, 1, 1, 1,  0, 0, 0, 1,  1, 0, 0, 1,  0, 1, 0, 0,  1, 1, 1, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 1, 1,  0, 1, 0, 0,  1, 1, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 1,  1, 0, 1, 0,  0, 1, 0, 0,  0, 1, 0, 0,  0, 1, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 1, 0,  1, 1, 0, 1,  0, 1, 0, 0,  0, 1, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 1, 0,  0, 0, 0, 1,  0, 1, 0, 0,  1, 1, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 1, 1, 1,  0, 1, 0, 1,  1, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 0, 0, 0,  0, 0, 1, 1,  0, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 1 },
+                { 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1 }
+        };
 
+        TileMap tempTileMap;
+        tempTileMap.tiles = (uint32*)tempTiles;
+        
         World world;
         world.tileSideInMeters = 1.4f;
-        world.tileSideInPixels = 64;
-        world.countX = 2;
-        world.countY = 2;
-        world.tileMaps = (TileMap*)tileMaps;
-        world.tileMapCountX = TILE_MAP_COLS;
-        world.tileMapCountY = TILE_MAP_ROWS;
-
-        // printf("%d %d %d\n",
-        //        world.tileMaps[0].tiles[0],
-        //        world.tileMaps[0].tiles[1],
-        //        world.tileMaps[0].tiles[2]);
+        world.tileSideInPixels = 64.0f;
+        world.tileMap = &tempTileMap;
+        world.tileCountX = TILE_MAP_COLS;
+        world.tileCountY = TILE_MAP_ROWS;
 
         GameState gameState;
         gameState.player = player;
         gameState.camera = camera;
         gameState.world = &world;
-        
+
         // While running
         bool quit = false;
 
@@ -454,10 +355,10 @@ int32 main( int32 argc, char** argv )
                 lastTime = currentTime;
                 currentTime = SDL_GetTicks();
                 dt = ((real32)currentTime - (real32)lastTime) / 1000;
-                
+
                 // Update game state
                 gameState = updateGame( gameState, dt );
-
+                
                 // Draw to the screen
                 draw( window, renderer, gameState );
 
@@ -469,11 +370,11 @@ int32 main( int32 argc, char** argv )
                 {
                         consoleCounter = 0;
                         printf("Player (%f, %f)\n",
-                               gameState.player.position.x,
-                               gameState.player.position.y);
+                               gameState.player.position.relative.x,
+                               gameState.player.position.relative.y);
                         printf("PlayerTile (%d, %d)\n",
-                               gameState.player.tileMapX,
-                               gameState.player.tileMapY);
+                               gameState.player.position.tileX,
+                               gameState.player.position.tileY);
                         printf("Camera (%f, %f)\n",
                                gameState.camera.position.x,
                                gameState.camera.position.y);
