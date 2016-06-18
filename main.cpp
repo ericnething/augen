@@ -233,13 +233,12 @@ drawBackground( SDL_Renderer*   renderer,
                         V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
                         real32 tileSize = world->tileSideInPixels;
                         V2 size = { tileSize, tileSize };
-                        V2 bufferZone = (-1)*size;
                         
                         WorldPosition differenceInPosition = testPosition - camera.position;
                         differenceInPosition = recanonicalizePosition(world, differenceInPosition);
                         V2 origin = getScreenCoordinates(world, differenceInPosition);
 
-                        if ( origin > bufferZone && origin < screenSize)
+                        if ( origin > (-1)*size && origin < screenSize)
                         {
                                 drawRectangle( renderer, origin, size, color, color, color, 1.0 );
                         }
@@ -266,7 +265,6 @@ draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
 
         WorldPosition differenceInPosition = player.position - camera.position;
         differenceInPosition = recanonicalizePosition(gameState.world, differenceInPosition);
-
         V2 origin = getScreenCoordinates(gameState.world, differenceInPosition);
         
         drawRectangle( renderer, origin, player.size, 1.0, 1.0, 0.0, 1.0 );

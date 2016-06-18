@@ -46,7 +46,8 @@ struct TileMap
 struct World
 {
         real32 tileSideInMeters;
-        uint32 tileSideInPixels;
+        real32 tileSideInPixels;
+//        real32 metersToPixels;
 
         int32 tileCountX;
         int32 tileCountY;
