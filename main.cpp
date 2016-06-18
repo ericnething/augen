@@ -2,71 +2,36 @@
 #include "intrinsics.h"
 #include "sdl.h"
 
-const real32 TILE_SIZE = 64;
-
-internal Camera
-updateCamera( GameState gameState )
-{
-        Camera camera = gameState.camera;
-        Player player = gameState.player;
-        real32 tileSize = gameState.world->tileSideInPixels;
-        
-        int32 scrollingType = 0;
-
-        // Smooth scrolling
-        if ( scrollingType == 0 )
-        {
-                camera.position.x = player.position.tileX * tileSize + player.position.relative.x - (SCREEN_WIDTH/2);
-                camera.position.y = player.position.tileY * tileSize + player.position.relative.y - (SCREEN_HEIGHT/2);
-        }
-        // Scroll by a fixed amount (full screen size)
-        else if ( scrollingType == 1 )
-        {
-                if (player.position.relative.x - camera.position.x > SCREEN_WIDTH)
-                {
-                        camera.position.x += SCREEN_WIDTH;
-                }
-                if (player.position.relative.x - camera.position.x < -player.size.x)
-                {
-                        camera.position.x -= SCREEN_WIDTH;
-                }
-                if (player.position.relative.y - camera.position.y > SCREEN_HEIGHT)
-                {
-                        camera.position.y += SCREEN_HEIGHT;
-                }
-                if (player.position.relative.y - camera.position.y < -player.size.y)
-                {
-                        camera.position.y -= SCREEN_HEIGHT;
-                }
-        }
-
-        return camera;
-}
+const real32 TILE_SIZE = 64.0f;
 
 internal WorldPosition
 recanonicalizePosition(World* world, WorldPosition pos)
 {
-        real32 tileSize = (real32)world->tileSideInPixels;
+        real32 tileSize = world->tileSideInPixels;
         
         if (pos.relative.x < 0)
         {
-                --pos.tileX;
-                pos.relative.x += tileSize;
+                int32 tileOffset = (pos.relative.x / tileSize) - 1;
+                pos.tileX += tileOffset;
+                pos.relative.x -= tileSize * tileOffset;
         }
         if (pos.relative.x >= tileSize)
         {
-                ++pos.tileX;
-                pos.relative.x -= tileSize;
+                int32 tileOffset = pos.relative.x / tileSize;
+                pos.tileX += tileOffset;
+                pos.relative.x -= tileSize * tileOffset;
         }
         if (pos.relative.y < 0)
         {
-                --pos.tileY;
-                pos.relative.y += tileSize;
+                int32 tileOffset = (pos.relative.y / tileSize) - 1;
+                pos.tileY += tileOffset;
+                pos.relative.y -= tileSize * tileOffset;
         }
         if (pos.relative.y >= tileSize)
         {
-                ++pos.tileY;
-                pos.relative.y -= tileSize;
+                int32 tileOffset = pos.relative.y / tileSize;
+                pos.tileY += tileOffset;
+                pos.relative.y -= tileSize * tileOffset;
         }
         return pos;
 }
@@ -95,6 +60,52 @@ isTileEmpty(World* world, WorldPosition pos)
                 isEmpty = true;
         }
         return isEmpty;
+}
+
+internal V2
+getScreenCoordinates(World* world, WorldPosition pos)
+{
+        real32 tileSize = world->tileSideInPixels;
+        V2 screenCoordinates = {
+                tileSize * pos.tileX + pos.relative.x,
+                tileSize * pos.tileY + pos.relative.y,
+        };
+        return screenCoordinates;
+}
+
+internal Camera
+updateCamera( GameState gameState )
+{
+        Camera camera = gameState.camera;
+        Player player = gameState.player;
+        V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
+        
+        int32 scrollingType = 0;
+
+        // Smooth scrolling
+        if ( scrollingType == 0 )
+        {
+                camera.position = player.position;
+                camera.position.relative += (-0.5f)*screenSize;
+        }
+        // Scroll by a fixed amount (full screen size)
+        else if ( scrollingType == 1 )
+        {
+                WorldPosition differenceInPosition = player.position - camera.position;
+                differenceInPosition = recanonicalizePosition(gameState.world, differenceInPosition);
+                V2 origin = getScreenCoordinates(gameState.world, differenceInPosition);
+                
+                if (origin > screenSize)
+                {
+                        camera.position.relative += screenSize;
+                }
+                if (origin < (-1)*player.size)
+                {
+                        camera.position.relative += (-1)*screenSize;
+                }
+        }
+        camera.position = recanonicalizePosition(gameState.world, camera.position);
+        return camera;
 }
 
 internal Player
@@ -197,7 +208,12 @@ drawBackground( SDL_Renderer*   renderer,
         {
                 for (int32 col = 0; col < world->tileCountX; ++col)
                 {
-                        uint32 tileValue = tileMap->tiles[row * world->tileCountX + col];
+                        // uint32 tileValue = tileMap->tiles[row * world->tileCountX + col];
+                        WorldPosition testPosition;
+                        testPosition.tileX = col;
+                        testPosition.tileY = row;
+                        testPosition.relative = { 0.0f, 0.0f };
+                        uint32 tileValue = getTileValue(world, testPosition);
 
                         real32 color = 0.0f;
 
@@ -213,20 +229,19 @@ drawBackground( SDL_Renderer*   renderer,
                         {
                                 color = 0.0f;
                         }
-                        
-                        real32 x = (real32)col * world->tileSideInPixels;
-                        real32 y = (real32)row * world->tileSideInPixels;
-                        
-                        V2 position = { x, y };
-                        V2 size = { world->tileSideInPixels, world->tileSideInPixels };
 
                         V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
-                        V2 origin = { 0, 0 };
+                        real32 tileSize = world->tileSideInPixels;
+                        V2 size = { tileSize, tileSize };
+                        V2 bufferZone = (-1)*size;
+                        
+                        WorldPosition differenceInPosition = testPosition - camera.position;
+                        differenceInPosition = recanonicalizePosition(world, differenceInPosition);
+                        V2 origin = getScreenCoordinates(world, differenceInPosition);
 
-                        if (position > (-1)*size && position < (camera.position + camera.size))
+                        if ( origin > bufferZone && origin < screenSize)
                         {
-                                drawRectangle( renderer, position - camera.position, size,
-                                               color, color, color, 1.0 );
+                                drawRectangle( renderer, origin, size, color, color, color, 1.0 );
                         }
                 }
         }
@@ -247,12 +262,14 @@ draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
         
         // Draw player
         V2 playerCenter = { player.size.x / 2, player.size.y };
-        V2 playerTile = { player.position.tileX, player.position.tileY };
-        V2 playerScreenPos = player.position.relative + gameState.world->tileSideInPixels * playerTile - playerCenter;
-        drawRectangle( renderer,
-                       playerScreenPos - camera.position,
-                       player.size,
-                       1.0, 1.0, 0.0, 1.0 );
+        player.position.relative = player.position.relative - playerCenter;
+
+        WorldPosition differenceInPosition = player.position - camera.position;
+        differenceInPosition = recanonicalizePosition(gameState.world, differenceInPosition);
+
+        V2 origin = getScreenCoordinates(gameState.world, differenceInPosition);
+        
+        drawRectangle( renderer, origin, player.size, 1.0, 1.0, 0.0, 1.0 );
         
         //Update screen
         SDL_RenderPresent( renderer );
@@ -282,13 +299,14 @@ int32 main( int32 argc, char** argv )
         Player player;
         player.position.tileX = 2;
         player.position.tileY = 2;
-        player.position.relative = { 10.0f, 30.0f }; // relative position inside tile
+        player.position.relative = { 10.0f, 30.0f };
         player.velocity = { 0.0f, 0.0f };
-        player.size     = { 30.0f, 50.0f };
+        player.size     = { 0.46875f * TILE_SIZE, 0.78125f * TILE_SIZE };
 
         Camera camera;
-        camera.position = { 0.0f, 0.0f }; // (map coordinates)
-        camera.size     = { SCREEN_WIDTH, SCREEN_HEIGHT };
+        camera.position = player.position;
+        camera.position.relative = { 0.0f, 0.0f };
+        camera.size = { SCREEN_WIDTH, SCREEN_HEIGHT };
 
         // Tilemap
         const uint32 TILE_MAP_ROWS = 24;
@@ -329,7 +347,7 @@ int32 main( int32 argc, char** argv )
         
         World world;
         world.tileSideInMeters = 1.4f;
-        world.tileSideInPixels = 64.0f;
+        world.tileSideInPixels = TILE_SIZE;
         world.tileMap = &tempTileMap;
         world.tileCountX = TILE_MAP_COLS;
         world.tileCountY = TILE_MAP_ROWS;
@@ -366,7 +384,7 @@ int32 main( int32 argc, char** argv )
                 SDL_Delay( 1000 / 60 );
                 
                 consoleCounter++;
-                if (consoleCounter >= 10)
+                if (consoleCounter >= 60)
                 {
                         consoleCounter = 0;
                         printf("Player (%f, %f)\n",
@@ -376,8 +394,11 @@ int32 main( int32 argc, char** argv )
                                gameState.player.position.tileX,
                                gameState.player.position.tileY);
                         printf("Camera (%f, %f)\n",
-                               gameState.camera.position.x,
-                               gameState.camera.position.y);
+                               gameState.camera.position.relative.x,
+                               gameState.camera.position.relative.y);
+                        printf("CameraTile (%d, %d)\n",
+                               gameState.camera.position.tileX,
+                               gameState.camera.position.tileY);
                 }
         }
 

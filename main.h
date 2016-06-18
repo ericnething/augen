@@ -33,8 +33,8 @@ struct V2
 
 struct WorldPosition
 {
-        uint32 tileX;
-        uint32 tileY;
+        int32 tileX;
+        int32 tileY;
         V2 relative;
 };
 
@@ -63,7 +63,7 @@ struct Player
 
 struct Camera
 {
-        V2 position;
+        WorldPosition position;
         V2 size;
 };
 
@@ -145,6 +145,52 @@ operator>( V2 a, V2 b )
 
 inline bool
 operator<( V2 a, V2 b )
+{
+        bool result = b > a;
+        return result;
+}
+
+inline WorldPosition
+operator+( WorldPosition a, WorldPosition b )
+{
+        WorldPosition result;
+
+        result.tileX = a.tileX + b.tileX;
+        result.tileY = a.tileY + b.tileY;
+        result.relative = a.relative + b.relative;
+        
+        return result;
+}
+
+
+inline WorldPosition
+operator-( WorldPosition a, WorldPosition b )
+{
+        WorldPosition result;
+
+        b.tileX *= -1;
+        b.tileY *= -1;
+        b.relative *= -1;
+        result = a + b;
+        
+        return result;
+}
+
+inline bool
+operator>( WorldPosition a, WorldPosition b )
+{
+        bool result = false;
+        if (a.tileX > b.tileX &&
+            a.tileY > b.tileY &&
+            a.relative > b.relative)
+        {
+                result = true;
+        }
+        return result;
+}
+
+inline bool
+operator<( WorldPosition a, WorldPosition b )
 {
         bool result = b > a;
         return result;
