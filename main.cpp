@@ -8,31 +8,33 @@ internal WorldPosition
 recanonicalizePosition(World* world, WorldPosition pos)
 {
         real32 tileSize = world->tileSideInMeters;
+        real32 tileRadius = tileSize / 2;
         
-        if (pos.relative.x < 0)
+        if (pos.relative.x < -tileRadius)
         {
-                int32 tileOffset = (pos.relative.x / tileSize) - 1;
+                int32 tileOffset = floorReal32ToInt32(pos.relative.x / tileSize);
                 pos.tileX += tileOffset;
                 pos.relative.x -= tileSize * tileOffset;
         }
-        if (pos.relative.x >= tileSize)
+        if (pos.relative.x >= tileRadius)
         {
-                int32 tileOffset = pos.relative.x / tileSize;
+                int32 tileOffset = floorReal32ToInt32(pos.relative.x / tileSize) + 1;
                 pos.tileX += tileOffset;
                 pos.relative.x -= tileSize * tileOffset;
         }
-        if (pos.relative.y < 0)
+        if (pos.relative.y < -tileRadius)
         {
-                int32 tileOffset = (pos.relative.y / tileSize) - 1;
+                int32 tileOffset = floorReal32ToInt32(pos.relative.y / tileSize);
                 pos.tileY += tileOffset;
                 pos.relative.y -= tileSize * tileOffset;
         }
-        if (pos.relative.y >= tileSize)
+        if (pos.relative.y >= tileRadius)
         {
-                int32 tileOffset = pos.relative.y / tileSize;
+                int32 tileOffset = floorReal32ToInt32(pos.relative.y / tileSize) + 1;
                 pos.tileY += tileOffset;
                 pos.relative.y -= tileSize * tileOffset;
         }
+        
         return pos;
 }
 
@@ -86,8 +88,12 @@ updateCamera( GameState gameState )
         // Smooth scrolling
         if ( scrollingType == 0 )
         {
+                real32 tileRadius = gameState.world->tileSideInMeters / 2;
+                V2 offsetForTileCenterAsOrigin = { tileRadius, tileRadius };
+                V2 offset = (1/gameState.world->metersToPixels) * (-0.5f)*screenSize + offsetForTileCenterAsOrigin;
                 camera.position = player.position;
-                camera.position.relative += (1/gameState.world->metersToPixels) * (-0.5f)*screenSize;
+                camera.position.relative += offset;
+                        
         }
         // Scroll by a fixed amount (full screen size)
         else if ( scrollingType == 1 )
@@ -102,7 +108,8 @@ updateCamera( GameState gameState )
                 }
                 if (origin.y > screenSize.y)
                 {
-                        camera.position.relative.y += (1/gameState.world->metersToPixels) * screenSize.y;
+                        // note: subtract the screen height instead of adding for right-hand coordinates
+                        camera.position.relative.y += (1/gameState.world->metersToPixels) * (-1)*screenSize.y;
                 }
                 if (origin.x < (-1/2)*player.size.x)
                 {
@@ -110,7 +117,8 @@ updateCamera( GameState gameState )
                 }
                 if (origin.y < (-1)*player.size.y)
                 {
-                        camera.position.relative.y += (1/gameState.world->metersToPixels) * (-1)*screenSize.y;
+                        // note: add the screen height instead of subtracting for right-hand coordinates
+                        camera.position.relative.y += (1/gameState.world->metersToPixels) * screenSize.y;
                 }
         }
         camera.position = recanonicalizePosition(gameState.world, camera.position);
@@ -255,8 +263,7 @@ drawBackground( SDL_Renderer*   renderer,
                         WorldPosition differenceInPosition = testPosition - camera.position;
                         differenceInPosition = recanonicalizePosition(world, differenceInPosition);
                         V2 origin = getScreenCoordinates(world, differenceInPosition);
-
-                        origin.y -= tileSize;
+                        origin.y -= tileSize; // to account for flipped y-coordinate
 
                         if ( origin > (-1)*size && origin < screenSize)
                         {
@@ -280,13 +287,14 @@ draw( SDL_Window* window, SDL_Renderer* renderer, const GameState gameState )
         drawBackground( renderer, gameState );
         
         // Draw player
-        V2 playerCenter = { player.size.x / 2, -player.size.y };
-        player.position.relative = player.position.relative - playerCenter;
+        real32 tileRadius = gameState.world->tileSideInMeters / 2;
+        V2 offsetForCenterOfTile = { tileRadius, tileRadius };
+        V2 playerCenter = { player.size.x / 2, -player.size.y }; // negate player height for flipped y-coordinate
+        player.position.relative = player.position.relative - playerCenter + offsetForCenterOfTile;
 
         WorldPosition differenceInPosition = player.position - camera.position;
         differenceInPosition = recanonicalizePosition(gameState.world, differenceInPosition);
         V2 origin = getScreenCoordinates(gameState.world, differenceInPosition);
-
         V2 size = gameState.world->metersToPixels * player.size;
         
         drawRectangle( renderer, origin, size, 1.0, 1.0, 0.0, 1.0 );
