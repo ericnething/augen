@@ -45,7 +45,7 @@ getTileValue(World* world, WorldPosition pos)
             (pos.tileY < 0 || pos.tileY >= world->tileCountY))
         {
                 // Invalid position. Out of bounds.
-                return 1;
+                return 2;
         }
         uint32 tileValue = world->tileMap->tiles[ pos.tileY * world->tileCountX + pos.tileX ];
         return tileValue;
@@ -230,11 +230,56 @@ drawBackground( SDL_Renderer*   renderer,
         Camera camera = gameState.camera;
         Player player = gameState.player;
 
-        for (int32 row = 0; row < world->tileCountY; ++row)
+        // for (int32 row = 0; row < world->tileCountY; ++row)
+        // {
+        //         for (int32 col = 0; col < world->tileCountX; ++col)
+        //         {
+        //                 // uint32 tileValue = tileMap->tiles[row * world->tileCountX + col];
+        //                 WorldPosition testPosition;
+        //                 testPosition.tileX = col;
+        //                 testPosition.tileY = row;
+        //                 testPosition.relative = { 0.0f, 0.0f };
+        //                 uint32 tileValue = getTileValue(world, testPosition);
+
+        //                 real32 color = 0.0f;
+
+        //                 if (tileValue == 0)
+        //                 {
+        //                         color = 0.5f;
+        //                 }
+        //                 if (tileValue == 1)
+        //                 {
+        //                         color = 1.0f;
+        //                 }
+        //                 if (player.position.tileX == col && player.position.tileY == row)
+        //                 {
+        //                         color = 0.0f;
+        //                 }
+
+        //                 V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
+        //                 real32 tileSize = world->tileSideInPixels;
+        //                 V2 size = { tileSize, tileSize };
+                        
+        //                 WorldPosition differenceInPosition = testPosition - camera.position;
+        //                 differenceInPosition = recanonicalizePosition(world, differenceInPosition);
+        //                 V2 origin = getScreenCoordinates(world, differenceInPosition);
+        //                 origin.y -= tileSize; // to account for flipped y-coordinate
+
+        //                 if ( origin > (-1)*size && origin < screenSize)
+        //                 {
+        //                         drawRectangle( renderer, origin, size, color, color, color, 1.0 );
+        //                 }
+        //         }
+        // }
+
+
+        int32 cameraMaxY = camera.position.tileY + camera.size.y;
+        int32 cameraMaxX = camera.position.tileX + camera.size.x;
+        
+        for (int32 row = camera.position.tileY - 1; row < cameraMaxY; ++row)
         {
-                for (int32 col = 0; col < world->tileCountX; ++col)
+                for (int32 col = camera.position.tileX - 1; col < cameraMaxX; ++col)
                 {
-                        // uint32 tileValue = tileMap->tiles[row * world->tileCountX + col];
                         WorldPosition testPosition;
                         testPosition.tileX = col;
                         testPosition.tileY = row;
@@ -243,6 +288,10 @@ drawBackground( SDL_Renderer*   renderer,
 
                         real32 color = 0.0f;
 
+                        if (tileValue == 2)
+                        {
+                                color = 0.0f;
+                        }
                         if (tileValue == 0)
                         {
                                 color = 0.5f;
@@ -259,7 +308,6 @@ drawBackground( SDL_Renderer*   renderer,
                         V2 screenSize = { SCREEN_WIDTH, SCREEN_HEIGHT };
                         real32 tileSize = world->tileSideInPixels;
                         V2 size = { tileSize, tileSize };
-                        
                         WorldPosition differenceInPosition = testPosition - camera.position;
                         differenceInPosition = recanonicalizePosition(world, differenceInPosition);
                         V2 origin = getScreenCoordinates(world, differenceInPosition);
@@ -271,6 +319,8 @@ drawBackground( SDL_Renderer*   renderer,
                         }
                 }
         }
+
+
 }
 
 // Draw to the screen
@@ -378,7 +428,7 @@ int32 main( int32 argc, char** argv )
         Camera camera;
         camera.position = player.position;
         camera.position.relative = { 0.0f, 0.0f };
-        camera.size = { SCREEN_WIDTH, SCREEN_HEIGHT };
+        camera.size = { SCREEN_WIDTH / world.tileSideInPixels + 1, SCREEN_HEIGHT / world.tileSideInPixels + 1 };
         
         GameState gameState;
         gameState.player = player;

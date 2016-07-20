@@ -31,6 +31,15 @@ struct V2
         real32 x, y;
 };
 
+struct TileChunkPosition
+{
+        uint32 tileMapX;
+        uint32 tileMapY;
+
+        int32 tileX;
+        int32 tileY;
+};
+
 struct WorldPosition
 {
         int32 tileX;
